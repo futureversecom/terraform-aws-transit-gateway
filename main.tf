@@ -4,6 +4,10 @@ locals {
     for k, v in var.vpc_attachments : setproduct([{ key = k }], v.tgw_routes) if var.create_tgw && can(v.tgw_routes)
   ]), 2)
 
+  vpn_attachments_with_routes = chunklist(flatten([
+    for k, v in var.vpn_attachments : setproduct([{ key = k }], v.tgw_routes) if var.create_tgw && can(v.tgw_routes)
+  ]), 2)
+
   tgw_default_route_table_tags_merged = merge(
     var.tags,
     { Name = var.name },
@@ -84,6 +88,7 @@ resource "aws_ec2_transit_gateway_vpc_attachment" "this" {
   )
 }
 
+
 ################################################################################
 # Route Table / Routes
 ################################################################################
@@ -108,6 +113,17 @@ resource "aws_ec2_transit_gateway_route" "this" {
 
   transit_gateway_route_table_id = var.create_tgw ? aws_ec2_transit_gateway_route_table.this[0].id : var.transit_gateway_route_table_id
   transit_gateway_attachment_id  = tobool(try(local.vpc_attachments_with_routes[count.index][1].blackhole, false)) == false ? aws_ec2_transit_gateway_vpc_attachment.this[local.vpc_attachments_with_routes[count.index][0].key].id : null
+}
+
+# This assumes the VPN attachment is already configured.
+resource "aws_ec2_transit_gateway_route" "vpn" {
+  count = var.create_tgw_routes ? length(local.vpn_attachments_with_routes) : 0
+
+  destination_cidr_block = local.vpn_attachments_with_routes[count.index][1].destination_cidr_block
+  blackhole              = try(local.vpn_attachments_with_routes[count.index][1].blackhole, null)
+
+  transit_gateway_route_table_id = var.create_tgw ? aws_ec2_transit_gateway_route_table.this[0].id : var.transit_gateway_route_table_id
+  transit_gateway_attachment_id  = tobool(try(local.vpn_attachments_with_routes[count.index][1].blackhole, false)) == false ? var.vpn_attachments[local.vpn_attachments_with_routes[count.index][0].key].transit_gateway_attachment_id : null
 }
 
 resource "aws_route" "this" {

@@ -102,6 +102,12 @@ variable "vpc_attachments" {
   default     = {}
 }
 
+variable "vpn_attachments" {
+  description = "Maps of maps of VPN details to attach to TGW. Type 'any' to disable type validation by Terraform."
+  type        = any
+  default     = {}
+}
+
 variable "tgw_vpc_attachment_tags" {
   description = "Additional tags for VPC attachments"
   type        = map(string)
